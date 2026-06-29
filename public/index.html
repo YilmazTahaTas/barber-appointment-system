@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recep Taş Hair Design</title>
+    
+    <link rel="icon" type="image/png" href="icon.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/confirmDate/confirmDate.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- PARTICLES ARKA PLAN -->
+    <canvas id="particlesCanvas"></canvas>
+
+    <div id="successPageContainer" style="display: none; padding: 40px 20px;"></div>
+
+    <section class="hero" id="heroSection">
+        <div class="hero-content fade-in-up">
+            <h1>Recep Taş <br> Hair Design</h1>
+            <p>Tarzınızı tesadüflere bırakmayın. Modern dokunuşların, ferah atmosferin ve <span class="highlight">kusursuz tıraşın</span> tek adresinde kendinizi ödüllendirin.</p>
+            <div class="hero-buttons" style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+                <button class="btn btn-create ripple-btn" onclick="toggleSection('appointment')">Randevu Oluştur</button>
+                <button class="btn btn-cancel-trigger ripple-btn" onclick="toggleSection('cancel')">Randevumu İptal Et</button>
+                <button class="btn btn-info-trigger ripple-btn" onclick="randevuSorgulaKutusu()" style="background-color: #252d2a; color: var(--text-color); width: 100%; max-width: 300px; border: 1px solid var(--input-border); font-weight: 600; cursor: pointer;">Randevum Ne Zaman?</button>
+            </div>
+            <br>
+            <p class="address-text">Adres: Karadeniz Mahallesi, General Aldoğan Cd. 92 /B, 34250 Gaziosmanpaşa/İstanbul
+                <a href="https://maps.app.goo.gl/XMgBwDPCFDXksPup6" 
+                   target="_blank" 
+                   style="color: var(--accent-color, #d4af37); text-decoration: underline; font-weight: 600;">
+                   <br>Haritalarda Göster
+                </a>
+            </p>
+        </div>
+    </section>
+
+    <section id="appointmentSection" class="appointment-section">
+        <h2>Randevu Bilgileri</h2>
+        <form id="randevuForm" onsubmit="submitForm(event)">
+            <div class="form-group">
+                <label for="fullname">Ad Soyad</label>
+                <input type="text" id="fullname" placeholder="Örn: Ahmet Yılmaz">
+                <span id="fullnameError" class="error-text"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Telefon Numarası</label>
+                <input type="tel" id="phone" placeholder="Örn: 0555 555 5555">
+                <span id="phoneError" class="error-text"></span>
+            </div>
+
+            <div class="form-group services-group">
+                <label>Hizmet Seçimi</label>
+                <div class="checkbox-container">
+                    <label class="checkbox-label"><input type="checkbox" name="service" value="Saç Tıraşı" data-price="400"> Saç Tıraşı</label>
+                    <label class="checkbox-label"><input type="checkbox" name="service" value="Sakal Tıraşı" data-price="150"> Sakal Tıraşı</label>
+                    <label class="checkbox-label"><input type="checkbox" name="service" value="Saç ve Sakal Tıraşı" data-price="550"> Saç ve Sakal Tıraşı</label>
+                    <label class="checkbox-label"><input type="checkbox" name="service" value="Çocuk Tıraşı" data-price="300"> Çocuk Tıraşı</label>
+                    <label class="checkbox-label"><input type="checkbox" name="service" value="Cilt Bakımı" data-price="200"> Cilt Bakımı</label>
+                    <label class="checkbox-label"><input type="checkbox" name="service" value="Saç Bakımı" data-price="200"> Saç Bakımı</label>
+                </div>
+                <span id="serviceError" class="error-text"></span>
+            </div>
+
+            <div class="form-group date-group">
+                <label for="randevu_tarihi">Tarih Seçimi</label>
+                <input type="text" id="randevu_tarihi" placeholder="Randevu günü seçmek için tıklayın">
+                <span id="dateError" class="error-text"></span>
+
+                <div id="saatSecimAlani" class="saat-wrapper" style="display: none;">
+                    <label style="margin-top: 15px; font-size: 1rem; color: #abc0b6;">Saat Seçimi</label>
+                    <div class="saat-grid">
+                        <button type="button" class="saat-btn" data-time="09:00">09:00</button>
+                        <button type="button" class="saat-btn" data-time="10:00">10:00</button>
+                        <button type="button" class="saat-btn" data-time="11:00">11:00</button>
+                        <button type="button" class="saat-btn" data-time="12:00">12:00</button>
+                        <button type="button" class="saat-btn" data-time="13:00">13:00</button>
+                        <button type="button" class="saat-btn" data-time="14:00">14:00</button>
+                        <button type="button" class="saat-btn" data-time="15:00">15:00</button>
+                        <button type="button" class="saat-btn" data-time="16:00">16:00</button>
+                        <button type="button" class="saat-btn" data-time="17:00">17:00</button>
+                        <button type="button" class="saat-btn" data-time="18:00">18:00</button>
+                        <button type="button" class="saat-btn" data-time="19:00">19:00</button>
+                        <button type="button" class="saat-btn" data-time="20:00">20:00</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group note-group" id="noteGroup" style="display: none;">
+                <label for="note">Not (İsteğe Bağlı)</label>
+                <textarea id="note" placeholder="Eklemek istediğiniz özel bir durum varsa belirtiniz..."></textarea>
+            </div>
+
+            <div class="price-box">
+                Toplam Tutar: <span id="totalPrice">0</span> TL
+            </div>
+
+            <div class="submit-container" style="grid-column: span 2; margin-top: 25px;">
+                <button type="submit" class="btn btn-submit ripple-btn" style="width: 100%;">Randevuyu Onayla</button>
+                <a href="/" class="btn-back-to-menu">Ana Menüye Dön</a>
+                <p class="dev-note">
+                    <strong>Taha Taş Tarafından Geliştirilmiştir</strong>
+                </p>
+            </div>
+        </form>
+    </section>
+
+    <section id="cancelSection" class="appointment-section cancel-section">
+        <h2>Randevumu İptal Et</h2>
+        <form id="cancelForm" onsubmit="submitCancel(event)">
+            <div class="form-group">
+                <label for="cancelPhone">Sistemde Kayıtlı Telefon Numaranız</label>
+                <input type="tel" id="cancelPhone" placeholder="Örn: 0555 555 5555">
+                <span id="cancelPhoneError" class="error-text"></span>
+            </div>
+            <div class="form-group">
+                <label for="cancelReason">İptal Nedeni (İsteğe Bağlı)</label>
+                <textarea id="cancelReason" placeholder="Randevunuzu neden iptal etmek istediğinizi belirtebilirsiniz..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-cancel-submit ripple-btn">Randevumu İptal Et</button>
+           <a href="/" class="btn-back-to-menu">Ana Menüye Dön</a>
+        </form>
+    </section>
+
+    <footer>
+        <div class="made">
+            <label>Recep Taş Hair Design © 2026 <br> Taha Taş Tarafından Geliştirilmiştir</label>
+        </div>
+        <a href="/admin-panel" class="btn btn-admin-nav">Yönetici Girişi</a>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/confirmDate/confirmDate.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <script src="script.js?v=3"></script>
+</body>
+</html>
