@@ -1,39 +1,41 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg'); 
 const session = require('express-session'); 
 const app = express();
-const PORT = 3000;
-const YONETICI_IP = '2a00:1d34:79ac:1701:182e:cee0:dafb:a733'; // KENDİ IP ADRESİNİ BURAYA YAZ
+
+const PORT = process.env.PORT || 3000;
+const YONETICI_IP = process.env.YONETICI_IP;
+
 app.use(cors());
 app.use(express.json());
 
-
 app.use(session({
-    secret: 'berber_ozel_sirri_9876', 
+    secret: process.env.SECRET_KEY, 
     resave: false,
     saveUninitialized: false,
     cookie: { maxAge: 60 * 60 * 1000 } 
 }));
 
 const pool = new Pool({
-    user: 'postgres',
-    host: '127.0.0.1',        
-    database: 'randevular_db',     
-    password: '123456',       
-    port: 5432,
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,        
+    database: process.env.DB_NAME,     
+    password: process.env.DB_PASSWORD,       
+    port: process.env.DB_PORT,
 });
+
 let blacklistedIPs = new Set(); 
-// Express kullanıyorsan
+
 app.use((req, res, next) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   next();
 });
-// Veritabanından yasaklıları çeken fonksiyon
+
 async function updateBlacklist() {
     try {
         const result = await pool.query('SELECT ip_address FROM blacklisted_ips');
-        // Set kullanarak arama hızını O(1) seviyesine düşürüyoruz (çok hızlıdır)
         blacklistedIPs = new Set(result.rows.map(row => row.ip_address));
         console.log("Yasaklı IP listesi güncellendi.");
     } catch (err) {
@@ -41,13 +43,11 @@ async function updateBlacklist() {
     }
 }
 
-// Sunucu ilk açıldığında listeyi bir kez çek
 updateBlacklist();
-// İp Yasaklama Endpoint'i
+
 app.post('/admin/yasakla', isAdmin, async (req, res) => {
     const { id } = req.body;
     try {
-        // 1. Önce IP adresini randevu tablosundan bul
         const randevu = await pool.query("SELECT ip_adresi FROM randevular WHERE id = $1", [id]);
         
         if (randevu.rows.length === 0 || !randevu.rows[0].ip_adresi) {
@@ -56,13 +56,8 @@ app.post('/admin/yasakla', isAdmin, async (req, res) => {
 
         const ipToBan = randevu.rows[0].ip_adresi;
 
-        // 2. ÖNCE Randevuyu veritabanından tamamen SİL
         await pool.query("DELETE FROM randevular WHERE id = $1", [id]);
-
-        // 3. SONRA IP adresini kara listeye ekle
         await pool.query("INSERT INTO blacklisted_ips (ip_address) VALUES ($1) ON CONFLICT DO NOTHING", [ipToBan]);
-
-        // 4. Bellekteki listeyi güncelle (Middleware'in hemen devreye girmesi için)
         await updateBlacklist();
 
         res.json({ success: true, message: "Randevu silindi ve IP başarıyla yasaklandı!" });
@@ -71,7 +66,7 @@ app.post('/admin/yasakla', isAdmin, async (req, res) => {
         res.status(500).json({ success: false, message: "İşlem başarısız oldu!" });
     }
 });
-// Her 5 dakikada bir listeyi otomatik güncelle (Böylece DB'ye yük binmez)
+
 setInterval(updateBlacklist, 5 * 60 * 1000);
 
 // Middleware
@@ -85,9 +80,10 @@ function blockMiddleware(req, res, next) {
 }
 
 app.use(blockMiddleware);
+
 const ADMIN_CREDENTIALS = {
-    username: 'admin',
-    password: 'receptas5869' 
+    username: process.env.ADMIN_USER,
+    password: process.env.ADMIN_PASS
 };
 
 function isAdmin(req, res, next) {
@@ -99,7 +95,6 @@ function isAdmin(req, res, next) {
 
 function tarihiTurkceyeCevir(tarihStr) {
     if (!tarihStr) return tarihStr;
-    // Eğer tarih zaten Türkçe formatındaysa (içinde gün veya ay adı varsa) elleme
     if (tarihStr.includes('Ocak') || tarihStr.includes('Şubat') || tarihStr.includes('Mart') || 
         tarihStr.includes('Nisan') || tarihStr.includes('Mayıs') || tarihStr.includes('Haziran') || 
         tarihStr.includes('Temmuz') || tarihStr.includes('Ağustos') || tarihStr.includes('Eylül') || 
@@ -142,8 +137,8 @@ app.get('/admin-panel', (req, res) => {
 
 app.use(express.static(__dirname + '/public'));
 
-const TELEGRAM_BOT_TOKEN = '8920370297:AAE13cpJZhUKVhiW3xv68uekdWiajs7DHIk';
-const TELEGRAM_CHAT_ID = '1321499445';
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 async function sendTelegramMessage(text) {
     const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
@@ -157,11 +152,11 @@ async function sendTelegramMessage(text) {
         console.error("Telegram mesajı gönderilemedi:", err);
     }
 }
+
 app.post('/api/admin-login', (req, res) => {
     const { username, password } = req.body;
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
-    // Eğer IP senin IP'n ile eşleşiyorsa şifre sorma/doğrula
     const ipMatch = (clientIp === YONETICI_IP);
     const credentialsMatch = (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password);
 
@@ -199,12 +194,10 @@ app.get('/api/dolu-randevular', async (req, res) => {
 app.post('/api/randevular', async (req, res) => {
     const { ad_soyad, telefon, randevu_tarihi, tras_turu, fiyat, not } = req.body;
 
-    // 1. Önce eksik alan var mı diye kontrol ediyoruz
     if (!ad_soyad || !telefon || !randevu_tarihi) {
         return res.status(400).json({ success: false, message: "Eksik alan bıraktınız!" });
     }
 
-    // 2. Telefon numarasını şimdi güvenle temizleyebiliriz
     let temizTelefon = telefon.toString().replace(/\D/g, '').trim();
     if (temizTelefon.length === 10 && temizTelefon.startsWith('5')) {
         temizTelefon = '0' + temizTelefon;
@@ -214,7 +207,6 @@ app.post('/api/randevular', async (req, res) => {
     const formatliTarih = tarihiTurkceyeCevir(randevu_tarihi);
 
     try {
-        // 1. AYNI SAATTE BAŞKA BİRİ RANDEVU ALMIŞ MI KONTROLÜ
         const checkDuplicateQuery = "SELECT id FROM randevular WHERE randevu_tarihi = $1 AND durum = 'aktif'";
         const duplicateResult = await pool.query(checkDuplicateQuery, [formatliTarih]);
 
@@ -222,11 +214,9 @@ app.post('/api/randevular', async (req, res) => {
             return res.status(400).json({ success: false, message: "Bu randevu saati az önce doldu, lütfen başka bir saat seçiniz!" });
         }
 
-        // 2. AYNI TELEFON NUMARASI O GÜN BAŞKA RANDEVU ALMIŞ MI KONTROLÜ
         const parcalar = formatliTarih.split(' ');
         const sadeceGunKismi = `${parcalar[0]} ${parcalar[1]}`; 
         
-        // Burada 'telefon' yerine artık 'temizTelefon' gönderiyoruz
         const checkDayQuery = "SELECT id FROM randevular WHERE telefon = $1 AND randevu_tarihi LIKE $2 AND durum = 'aktif'";
         const dayResult = await pool.query(checkDayQuery, [temizTelefon, `${sadeceGunKismi}%`]);
 
@@ -234,12 +224,10 @@ app.post('/api/randevular', async (req, res) => {
             return res.status(400).json({ success: false, message: "Bu telefon numarasıyla o güne ait zaten aktif bir randevunuz var!" });
         }
 
-        // 3. HER ŞEY YOLUNDAYSA VERİTABANINA KAYDET
         const queryText = `
             INSERT INTO randevular (ad_soyad, telefon, randevu_tarihi, tras_turu, fiyat, not_metni, durum, olusturulma_tarihi, ip_adresi)
             VALUES ($1, $2, $3, $4, $5, $6, 'aktif', NOW(), $7) RETURNING *
         `;
-        // Veritabanına da temizlenmiş formatı (05xxxxxxxxx) kaydediyoruz
         const values = [ad_soyad, temizTelefon, formatliTarih, tras_turu, fiyat, not || null, ipAdresi];
         await pool.query(queryText, values);
 
@@ -262,6 +250,7 @@ app.post('/api/randevular', async (req, res) => {
         res.status(500).json({ success: false, message: "Veritabanına kaydedilemedi!" });
     }
 });
+
 app.post('/api/randevu-sorgula', async (req, res) => {
     let { telefon } = req.body;
     if (!telefon) {
@@ -269,10 +258,8 @@ app.post('/api/randevu-sorgula', async (req, res) => {
     }
 
     try {
-        // Numara içindeki boşlukları veya karakterleri tamamen temizle
         let temizNumara = telefon.toString().replace(/\D/g, '').trim();
 
-        // Veritabanında ne yazıyorsa (05427974569) birebir o sütunla eşleştiriyoruz
         const checkQuery = `
             SELECT ad_soyad, randevu_tarihi, tras_turu, fiyat 
             FROM randevular 
@@ -282,7 +269,6 @@ app.post('/api/randevu-sorgula', async (req, res) => {
         
         const checkResult = await pool.query(checkQuery, [temizNumara]);
 
-        // Veritabanından dönen satırları konsola yazdırıp terminalden kontrol edelim:
         console.log("Sorgulanan Numara:", temizNumara);
         console.log("Bulunan Satır Sayısı:", checkResult.rows.length);
         console.log("Gelen Veriler:", checkResult.rows);
@@ -300,8 +286,8 @@ app.post('/api/randevu-sorgula', async (req, res) => {
         res.status(500).json({ success: false, message: "Sorgulama yapılırken sunucu hatası oluştu!" });
     }
 });
+
 app.post('/api/randevu-iptal', async (req, res) => {
-    // Frontend'den gelen telefon, seçilen spesifik tarih ve iptal nedenini alıyoruz
     const { telefon, randevu_tarihi, iptal_nedeni } = req.body;
     
     if (!telefon || !randevu_tarihi) {
@@ -309,13 +295,11 @@ app.post('/api/randevu-iptal', async (req, res) => {
     }
 
     try {
-        // Telefon numarasını temizleyerek kontrolü sağlama alalım (05xxxxxxxxx formatı)
         let temizTelefon = telefon.toString().replace(/\D/g, '').trim();
         if (temizTelefon.length === 10 && temizTelefon.startsWith('5')) {
             temizTelefon = '0' + temizTelefon;
         }
 
-        // 1. KONTROL: Sadece o telefona VE o spesifik tarihe ait AKTİF bir randevu var mı?
         const checkQuery = "SELECT * FROM randevular WHERE telefon = $1 AND randevu_tarihi = $2 AND durum = 'aktif'";
         const checkResult = await pool.query(checkQuery, [temizTelefon, randevu_tarihi]);
 
@@ -325,7 +309,6 @@ app.post('/api/randevu-iptal', async (req, res) => {
 
         const iptalEdilenRandevu = checkResult.rows[0];
 
-        // 2. GÜNCELLEME: Sadece o numaraya VE o spesifik tarihe ait satırı 'iptal' yapıyoruz
         const updateQuery = `
             UPDATE randevular 
             SET durum = 'iptal', not_metni = $1 
@@ -333,7 +316,6 @@ app.post('/api/randevu-iptal', async (req, res) => {
         `;
         await pool.query(updateQuery, [iptal_nedeni || 'Belirtilmedi', temizTelefon, randevu_tarihi]);
 
-        // Telegram bildirimi (Sadece iptal edilen o tek randevunun bilgilerini gönderir)
         const telegramMesaj = `
 🚨 **RANDEVU İPTAL EDİLDİ** 🚨
 
@@ -431,7 +413,7 @@ setInterval(async () => {
                     await sendTelegramMessage(hatirlatmaMesaj);
 
                     await pool.query("UPDATE randevular SET hatirlatma_gonderildi = TRUE WHERE id = $1", [randevu.id]);
-                    console.log(`[Hatırlatıcı] ${randevu.ad_soyad} için hatırlatma billingi gönderildi.`);
+                    console.log(`[Hatırlatıcı] ${randevu.ad_soyad} için hatırlatma bildirimi gönderildi.`);
                 }
             }
         }
